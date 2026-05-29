@@ -51,6 +51,9 @@ switch ($_POST['cmd']) {
 	case 'refresh':
 		refreshData();
 		break;
+	case 'refreshpool':
+		file_put_contents('/tmp/zfsm_reload_pool', $_POST['zpool']);
+		break;
 	case 'createdataset':
 		$zdataset = $_POST['data']['zpool']."/".$_POST['data']['name'];
 		$zfs_cparams = cleanZFSCreateDatasetParams($_POST['data']);
@@ -103,21 +106,21 @@ switch ($_POST['cmd']) {
 		break;
 	case 'lockdataset':
 		$ret = lockDataset($_POST['zdataset']);
-		
+
 		returnAnswer($ret, "ZFS Dataset Lock", "Dataset Locked successfully", "Unable to Lock dataset", true, false);
 
 		break;
 	case 'unlockdataset':
 		$ret = unlockDataset($_POST['zdataset'], $_POST['passphrase']);
-		
+
 		returnAnswer($ret, "ZFS Dataset Unlock", "Dataset Unlocked successfully", "Unable to Unlock dataset", true, false);
-		
+
 		break;
 	case 'promotedataset':
 		$ret = promoteDataset($_POST['zdataset'], 0);
 
 		returnAnswer($ret, "ZFS Dataset Promote", "Dataset promoted successfully", "Unable to promote dataset", true, false);
-		
+
 		break;
 	case 'movedirectory':
 		$ret = moveDirectory($_POST['directory'], $_POST['newname']);
@@ -168,7 +171,11 @@ switch ($_POST['cmd']) {
 
 		break;
 	case 'snapshotdataset':
-		$snapshot = $zfsm_cfg['snap_prefix'].date($zfsm_cfg['snap_pattern']);
+		if ($zfsm_cfg['snap_use_utc']) {
+			$snapshot = $zfsm_cfg['snap_prefix'].gmdate($zfsm_cfg['snap_pattern']);
+		} else {
+			$snapshot = $zfsm_cfg['snap_prefix'].date($zfsm_cfg['snap_pattern']);
+		}
 
 		$ret = createDatasetSnapshot( $_POST['zdataset'], $snapshot, $_POST['recursive']);
 

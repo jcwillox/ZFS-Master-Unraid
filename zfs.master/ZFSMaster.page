@@ -14,6 +14,11 @@ require_once $docroot."/webGui/include/Helpers.php";
 
 $zfsm_cfg = loadConfig(parse_plugin_cfg($plugin, true));
 $zfsm_cfg['version'] = parse_ini_file('/etc/unraid-version')['version'];
+
+$zfsm_cache = null;
+if (file_exists('/tmp/zfsm_cache.json')) {
+	$zfsm_cache = json_decode(file_get_contents('/tmp/zfsm_cache.json'), true);
+}
 ?>
 
 <link type="text/css" rel="stylesheet" href="/webGui/styles/font-awesome.css?v=1545863026">
@@ -96,6 +101,7 @@ $zfsm_cfg['version'] = parse_ini_file('/etc/unraid-version')['version'];
 <script>
   var zfs_sub = new NchanSubscriber('/sub/zfs_master',{subscriber:'websocket'});
   var zfsm_config = <?=json_encode($zfsm_cfg)?>;
+  var zfsm_server_cache = <?=json_encode($zfsm_cache)?>;
 
   if (zfsm_config['version'].localeCompare('6.12.13', undefined, { numeric: true, sensitivity: 'base' }) == 1) {
 	$('#zfs_master').removeClass('disk_status legacy');
@@ -161,7 +167,11 @@ $zfsm_cfg['version'] = parse_ini_file('/etc/unraid-version')['version'];
 
   $(function() {
 	  zfs_sub.start();
-	  if (zfsm_config['refresh_interval'] > 0) {
+	  if (zfsm_server_cache !== null) {
+		updateFullBodyTable(zfsm_server_cache, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
+		$('#zfsm-last-refresh').text('Last refresh at '+zfsm_server_cache.timestamp);
+		processHiddenDatasets();
+	  } else if (zfsm_config['refresh_interval'] > 0) {
 	  	requestRefresh();
 	  } else {
 		loadCache();
@@ -174,6 +184,10 @@ $zfsm_cfg['version'] = parse_ini_file('/etc/unraid-version')['version'];
 
   function requestRefresh() {
 	  $.post('<?=$urlzmadmin?>', {cmd: 'refresh'} );
+  }
+
+  function refreshPool(zpool) {
+	  $.post('<?=$urlzmadmin?>', {cmd: 'refreshpool', zpool: zpool} );
   }
   
   function replaceElementClass(element, oldClass, newClass){

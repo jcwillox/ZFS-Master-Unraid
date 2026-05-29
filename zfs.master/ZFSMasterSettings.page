@@ -31,6 +31,16 @@ _(Refresh Interval)_:
 > How often the information gets updated. "No refresh" means that you have to press the refresh button.
 :end
 
+_(Refresh Only Awake Disks)_:
+: <select name="refresh_awake_only">
+	<?=mk_option($zfsm_cfg['refresh_awake_only'], "0", _('No'))?>
+	<?=mk_option($zfsm_cfg['refresh_awake_only'], "1", _('Yes'))?>
+  </select>
+
+:zc_settings_refresh_awake_only_plug:
+> If set to "yes" the plugin will only refresh pools that have at least one awake disk.
+:end
+
 
 _(Lazy Load)_:
 : <select name="lazy_load">
@@ -104,6 +114,16 @@ _(Snapshots Prefix (Do not include the '@' or spaces))_:
 
 :zc_settings_snapshots_prefix_plug:
 > Prefix for the name of the snapshots taken through the interface eg: pattern:"Y-m-d-His", prefix:"zfs-master-" snapshot name: "tank/my_dataset@zfs-master-2022-04-13-171920".
+:end
+
+_(Use UTC for Snapshot Naming)_:
+: <select name="snap_use_utc">
+	<?=mk_option($zfsm_cfg['snap_use_utc'], "0", _('No'))?>
+	<?=mk_option($zfsm_cfg['snap_use_utc'], "1", _('Yes'))?>
+  </select>
+
+:zc_settings_snap_use_utc_plug:
+> Use UTC time instead of local time when generating snapshot names.
 :end
 
 &nbsp;

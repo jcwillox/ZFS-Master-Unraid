@@ -2,6 +2,7 @@
 
 function loadConfig($config) {	
 	$zfsm_ret['refresh_interval'] = isset($config['general']['refresh_interval']) ? intval($config['general']['refresh_interval']) : 30;
+	$zfsm_ret['refresh_awake_only'] = isset($config['general']['refresh_awake_only']) ? intval($config['general']['refresh_awake_only']) : 0;
 	$zfsm_ret['lazy_load'] = isset($config['general']['lazy_load']) ? intval($config['general']['lazy_load']) : "0";
 	$zfsm_ret['znapzend_data'] = isset($config['general']['znapzend_data']) ? intval($config['general']['znapzend_data']) : "0";
 
@@ -19,6 +20,7 @@ function loadConfig($config) {
 		
 	$zfsm_ret['snap_max_days_alert'] = isset($config['general']['snap_max_days_alert']) ? intval($config['general']['snap_max_days_alert']) : 30;
 	$zfsm_ret['snap_prefix'] = isset($config['general']['snap_prefix']) ? $config['general']['snap_prefix'] : '';
+	$zfsm_ret['snap_use_utc'] = isset($config['general']['snap_use_utc']) ? intval($config['general']['snap_use_utc']) : 0;
 
 	if (!isset($config['general']['snap_pattern']) || $config['general']['snap_pattern'] == ''):
 		$zfsm_ret['snap_pattern'] = 'Y-m-d-His';
