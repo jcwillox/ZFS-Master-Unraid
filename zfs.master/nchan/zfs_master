@@ -35,12 +35,7 @@ function isPoolAwake($devices) {
     foreach ($device_list as $device) {
         $device = trim($device);
         if (empty($device)) continue;
-
-        // check if it's a disk device (starts with /dev/ or just the name)
-        // unraid often uses names like 'sdX' or 'nvmeXn1'
         $path = (strpos($device, '/') === false) ? "/dev/$device" : $device;
-
-        // Use hdparm -C to check power status
         $status = shell_exec("hdparm -C " . escapeshellarg($path) . " 2>&1");
         if (strpos($status, "active/idle") !== false) {
             return true;
@@ -81,11 +76,9 @@ function getData($include_snapshots, $exclusion_pattern, $directory_listing, $ex
             $zpool_global[$zpool_name]['MountPoint'] = $zpool_datasets[$zpool_name]['mountpoint'];
             $zpool_global[$zpool_name]['LastRefresh'] = date('Y-m-d H:i:s');
         } else if ($cache && isset($cache['datasets'][$zpool_name])) {
-            // Use cached data
             $zpool_datasets[$zpool_name] = $cache['datasets'][$zpool_name];
             $zpool_global[$zpool_name] = $cache['pools'][$zpool_name];
         } else {
-            // No cache and shouldn't refresh, skip or provide minimal data
             if ($include_snapshots):
                 $zpool_datasets[$zpool_name] = array('name' => $zpool_name, 'child' => array(), 'snapshots' => array(), 'total_snapshots' => 0, 'mountpoint' => '');
             else:
