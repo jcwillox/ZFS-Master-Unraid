@@ -112,11 +112,16 @@ function getData($include_snapshots, $exclusion_pattern, $directory_listing, $ex
 }
 
 function getAllData($exclusion_pattern, $directory_listing, $ext, $awake_only = 0, $force_pool = null) {
-    publish('zfs_master', '{"op":"start_refresh"}');
+    $refresh_message = array('op' => 'start_refresh');
+    if ($force_pool !== null) {
+        $refresh_message['pool'] = $force_pool;
+    }
+    publish('zfs_master', json_encode($refresh_message));
 
     $message = getData(true, $exclusion_pattern, $directory_listing, $ext, $awake_only, $force_pool);
 
-    publish('zfs_master', '{"op":"stop_refresh"}');
+    $refresh_message['op'] = 'stop_refresh';
+    publish('zfs_master', json_encode($refresh_message));
 }
 
 function getDatasetsSnapshots($zpool, $zdatasets, $ext) {
@@ -136,7 +141,11 @@ function getDatasetsSnapshots($zpool, $zdatasets, $ext) {
 }
 
 function getLazyLoadData($exclusion_pattern, $directory_listing, $ext, $awake_only = 0, $force_pool = null) {
-    publish('zfs_master', '{"op":"start_refresh"}');
+    $refresh_message = array('op' => 'start_refresh');
+    if ($force_pool !== null) {
+        $refresh_message['pool'] = $force_pool;
+    }
+    publish('zfs_master', json_encode($refresh_message));
 
     $message = getData(false, $exclusion_pattern, $directory_listing, $ext, $awake_only, $force_pool);
 
@@ -146,7 +155,8 @@ function getLazyLoadData($exclusion_pattern, $directory_listing, $ext, $awake_on
         }
     endforeach;
 
-    publish('zfs_master', '{"op":"stop_refresh"}');
+    $refresh_message['op'] = 'stop_refresh';
+    publish('zfs_master', json_encode($refresh_message));
 }
 
 function notifyConfigUpdate($config) {

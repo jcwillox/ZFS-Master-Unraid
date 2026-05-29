@@ -44,6 +44,22 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 	  margin: 2px 2px!important;
   }
 
+  .zfs_pool_refresh_status {
+	  display: inline-block;
+	  margin: 0 8px;
+	  white-space: nowrap;
+  }
+
+  .zfs_pool_refresh_button {
+	  display: inline-flex;
+	  align-items: center;
+	  justify-content: center;
+	  width: 24px;
+	  height: 24px;
+	  margin: 0 8px 0 0;
+	  vertical-align: middle;
+  }
+
   .zfs_master_title {
 	margin-top: -45px!important;
   }
@@ -112,10 +128,12 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 	var msg = JSON.parse(data);
     if (msg.op == 'getAll') {
 		updateFullBodyTable(msg.data, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
+		$('#zfsm-last-refresh').text('Last refresh at '+msg.data.timestamp);
 
 		saveCache(msg.data);
     } else if (msg.op == 'getDatasets') {
 		updateFullBodyTable(msg.data, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
+		$('#zfsm-last-refresh').text('Last refresh at '+msg.data.timestamp);
 
         for (const pool in msg.data['pools']) {
 			$('#'+pool+'-attribute-snapshots > span').text('0');
@@ -134,14 +152,10 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 
 		updateSnapshotCache(msg.data, total_snaps);
 	} else if (msg.op == 'start_refresh') {
-		const curDate = new Date();
-
-		$('#zfsm-last-refresh').text('Last refresh at '+curDate.toLocaleString('en-US', { hour12: false }));
-
-		replaceElementClass('#zfsm-refresh', 'fa-refresh', 'fa-spinner fa-spin');
+		setRefreshIconState(msg.pool, true);
 
 	} else if (msg.op == 'stop_refresh') {
-		replaceElementClass('#zfsm-refresh', 'fa-spinner fa-spin', 'fa-refresh');
+		setRefreshIconState(msg.pool, false);
 	} else if (msg.op == 'updateConfig') {
 		zfsm_config = msg.data;
 	} else if (msg.op == 'start_directory_copy') {
@@ -189,10 +203,18 @@ if (file_exists('/tmp/zfsm_cache.json')) {
   function refreshPool(zpool) {
 	  $.post('<?=$urlzmadmin?>', {cmd: 'refreshpool', zpool: zpool} );
   }
-  
-  function replaceElementClass(element, oldClass, newClass){
-	  $(element).removeClass(oldClass);
-	  $(element).addClass(newClass);
+
+  function setRefreshIconState(pool, isRefreshing) {
+	  const iconId = pool ? 'zfsm-refresh-'+pool : 'zfsm-refresh';
+	  const icon = document.getElementById(iconId);
+
+	  if (!icon) {
+		  return;
+	  }
+
+	  icon.classList.toggle('fa-refresh', !isRefreshing);
+	  icon.classList.toggle('fa-spinner', isRefreshing);
+	  icon.classList.toggle('fa-spin', isRefreshing);
   }
   
   function getUnraidParentElement() {
@@ -203,9 +225,10 @@ if (file_exists('/tmp/zfsm_cache.json')) {
   }
 
   function saveCache(data) {
-	const curDate = new Date();
-	
-	data['timestamp'] = curDate.toLocaleString('en-US', { hour12: false })
+	if (data['timestamp'] === undefined) {
+		const curDate = new Date();
+		data['timestamp'] = curDate.toLocaleString('en-US', { hour12: false });
+	}
 
 	saveToLocalStorage('zfsm-cache', data);
   }

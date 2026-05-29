@@ -573,17 +573,19 @@ function generatePoolTableRows(zpool, devices, show_status, display) {
 	const status_msg = getPoolStatusMsg(zpool['Health']);
 
 	const lastRefresh = zpool['LastRefresh'] ? zpool['LastRefresh'] : 'Never';
+	const refreshIconId = 'zfsm-refresh-'+zpool['Pool'];
 
 	// Name and devices
-	var tr = '<td id="'+zpool['Pool']+'-attribute-pool"><a class="info hand"><i id="zpool-'+zpool['Pool']+'" class="fa fa-circle orb '+status_color+'-orb"></i><span>'+nl2br(devices)+'<br><br>Last Refresh: '+lastRefresh+'</span></a> '+zpool['Pool']+'</td>';
+	var tr = '<td id="'+zpool['Pool']+'-attribute-pool"><a class="info hand"><i id="zpool-'+zpool['Pool']+'" class="fa fa-circle orb '+status_color+'-orb"></i><span>'+nl2br(devices)+'</span></a> '+zpool['Pool']+'</td>';
 
 	// Health
 	tr += '<td id="'+zpool['Pool']+'-attribute-health"><a class="info hand"><i class="fa fa-heartbeat" style="color:'+status_color+'"></i><span>'+status_msg+'</span></a> '+zpool['Health']+'</td>';
 
 	// Buttons
-	tr += '<td id="'+zpool['Pool']+'-attribute-name"><button type="button" id="show-zpool-'+zpool['Pool']+'" onclick="togglePoolTable(\'show-zpool-'+zpool['Pool']+'\', \'zdataset-'+zpool['Pool']+'\');">'+show_button_text+'</button>'; 
-	tr += '<button type="button" onclick="refreshPool(\''+zpool['Pool']+'\');">Refresh Pool</button>';
-	tr += '<button type="button" onclick="createDataset(\''+zpool['Pool']+'\')";">Create Dataset</button></td>';
+	tr += '<td id="'+zpool['Pool']+'-attribute-name"><button type="button" id="show-zpool-'+zpool['Pool']+'" onclick="togglePoolTable(\'show-zpool-'+zpool['Pool']+'\', \'zdataset-'+zpool['Pool']+'\');">'+show_button_text+'</button>';
+	tr += '<span class="zfs_pool_refresh_status">Last refresh: '+lastRefresh+'</span>';
+	tr += '<a style="cursor:pointer" class="tooltip zfs_pool_refresh_button" title="Refresh '+zpool['Pool']+'" onclick="refreshPool(\''+zpool['Pool']+'\');"><i id="'+refreshIconId+'" class="fa fa-refresh"></i></a>';
+	tr += '<button type="button" onclick="createDataset(\''+zpool['Pool']+'\');">Create Dataset</button></td>';
 
 	// Size
 	tr += '<td id="'+zpool['Pool']+'-attribute-size">'+zpool['Size']+'</td>'; 
