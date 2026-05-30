@@ -166,6 +166,17 @@ function getZFSPools() {
 	return $retPools;
 }
 
+function getZFSPool($zpool) {
+	$regex = "/^(?'pool'[\w\._\-]+)\s+(?'size'[\d.]+.)\s+(?'used'[\d.]+.)\s+(?'free'[\d.]+.)\s+(?'checkpoint'([\d.]+.)|-)\s+(?'expandz'([\d.]+.)|-)\s+(?'fragmentation'([\d.]+.)|-)\s+(?'usedpercent'[\d.]+.)\s+(?'dedup'[\d.]+.x)\s+(?'health'\w+)/";
+	$tmpPools = processCmdLine($regex, "zpool list -v ".escapeshellarg($zpool), "cleanupZPoolInfo");
+
+	if (count($tmpPools) <= 0):
+		return null;
+	endif;
+
+	return $tmpPools[0];
+}
+
 function getZFSPoolDevices($zpool) {
 	$cmd_line = "zpool status -v ".$zpool." | awk '/config:/{flag=1;next}/errors:/{flag=0}flag{if($1!=\"NAME\" && NF>1)print $1}'|tail -n+2"; 
 	return trim(shell_exec($cmd_line.' 2>&1'));

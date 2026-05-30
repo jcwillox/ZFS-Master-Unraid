@@ -30,6 +30,67 @@ if (is_file($config_file) && is_readable($config_file)):
     $zfsm_cfg_timestamp = filemtime("/boot/config/plugins/zfs.master/zfs.master.cfg");
 endif;
 
+function loadCacheData() {
+    if (!file_exists('/tmp/zfsm_cache.json')):
+        return null;
+    endif;
+
+    $cache = json_decode(file_get_contents('/tmp/zfsm_cache.json'), true);
+
+    if (!is_array($cache)):
+        return null;
+    endif;
+
+    $cache['pools'] = isset($cache['pools']) && is_array($cache['pools']) ? $cache['pools'] : array();
+    $cache['devices'] = isset($cache['devices']) && is_array($cache['devices']) ? $cache['devices'] : array();
+    $cache['datasets'] = isset($cache['datasets']) && is_array($cache['datasets']) ? $cache['datasets'] : array();
+
+    return $cache;
+}
+
+function writeCacheData($data) {
+    file_put_contents('/tmp/zfsm_cache.json', json_encode($data));
+}
+
+function buildEmptyDatasetData($zpool_name, $include_snapshots) {
+    $dataset = array(
+        'name' => $zpool_name,
+        'child' => array(),
+        'mountpoint' => ''
+    );
+
+    if ($include_snapshots):
+        $dataset['snapshots'] = array();
+        $dataset['total_snapshots'] = 0;
+    endif;
+
+    return $dataset;
+}
+
+function getScopedPoolRefreshData($zpool_name, $include_snapshots, $exclusion_pattern, $directory_listing, $ext) {
+    $zpool_info = getZFSPool($zpool_name);
+
+    if (!is_array($zpool_info)):
+        return null;
+    endif;
+
+    if ($include_snapshots):
+        $dataset = getZFSPoolDatasetsAndSnapshots($zpool_name, $exclusion_pattern, $ext, $directory_listing);
+        $zpool_info['Snapshots'] = $dataset['total_snapshots'];
+    else:
+        $dataset = getZFSPoolDatasets($zpool_name, $exclusion_pattern, $ext, $directory_listing);
+    endif;
+
+    $zpool_info['MountPoint'] = $dataset['mountpoint'];
+    $zpool_info['LastRefresh'] = date('Y-m-d H:i:s');
+
+    return array(
+        'pool' => $zpool_info,
+        'devices' => getZFSPoolDevices($zpool_name),
+        'dataset' => $dataset
+    );
+}
+
 function isPoolAwake($devices) {
     $device_list = explode("\n", $devices);
     foreach ($device_list as $device) {
@@ -50,51 +111,60 @@ function isPoolAwake($devices) {
 }
 
 function getData($include_snapshots, $exclusion_pattern, $directory_listing, $ext, $awake_only = 0, $force_pool = null) {
-    $zpool_global = getZFSPools();
-    $zpool_devices = array();
-    $zpool_datasets = array();
+    $cache = loadCacheData();
 
-    $cache = null;
-    if (file_exists('/tmp/zfsm_cache.json')) {
-        $cache = json_decode(file_get_contents('/tmp/zfsm_cache.json'), true);
-    }
+    if ($force_pool !== null):
+        $zpool_global = $cache ? $cache['pools'] : array();
+        $zpool_devices = $cache ? $cache['devices'] : array();
+        $zpool_datasets = $cache ? $cache['datasets'] : array();
 
-    foreach ($zpool_global as $zpool):
-        $zpool_name = $zpool['Pool'];
+        $scoped_data = getScopedPoolRefreshData($force_pool, $include_snapshots, $exclusion_pattern, $directory_listing, $ext);
+        if ($scoped_data !== null):
+            $cached_pool = isset($zpool_global[$force_pool]) && is_array($zpool_global[$force_pool]) ? $zpool_global[$force_pool] : array();
+            $zpool_global[$force_pool] = array_merge($cached_pool, $scoped_data['pool']);
+            $zpool_devices[$force_pool] = $scoped_data['devices'];
+            $zpool_datasets[$force_pool] = $scoped_data['dataset'];
+        endif;
+    else:
+        $zpool_global = getZFSPools();
+        $zpool_devices = array();
+        $zpool_datasets = array();
 
-        $zpool_devices[$zpool_name] = getZFSPoolDevices($zpool_name);
+        foreach ($zpool_global as $zpool):
+            $zpool_name = $zpool['Pool'];
 
-        $should_refresh = true;
-        if ($awake_only && $force_pool !== $zpool_name) {
-            if (!isPoolAwake($zpool_devices[$zpool_name])) {
-                $should_refresh = false;
+            $zpool_devices[$zpool_name] = getZFSPoolDevices($zpool_name);
+
+            $should_refresh = true;
+            if ($awake_only):
+                $should_refresh = isPoolAwake($zpool_devices[$zpool_name]);
+            endif;
+
+            if ($should_refresh) {
+                if ($include_snapshots):
+                    $zpool_datasets[$zpool_name] = getZFSPoolDatasetsAndSnapshots($zpool_name, $exclusion_pattern, $ext, $directory_listing);
+                    $zpool_global[$zpool_name]['Snapshots'] = $zpool_datasets[$zpool_name]['total_snapshots'];
+                else:
+                    $zpool_datasets[$zpool_name] = getZFSPoolDatasets($zpool_name, $exclusion_pattern, $ext, $directory_listing);
+                endif;
+                $zpool_global[$zpool_name]['MountPoint'] = $zpool_datasets[$zpool_name]['mountpoint'];
+                $zpool_global[$zpool_name]['LastRefresh'] = date('Y-m-d H:i:s');
+            } else if ($cache && isset($cache['datasets'][$zpool_name]) && isset($cache['pools'][$zpool_name])) {
+                $zpool_datasets[$zpool_name] = $cache['datasets'][$zpool_name];
+                $zpool_global[$zpool_name] = $cache['pools'][$zpool_name];
+                if (isset($cache['devices'][$zpool_name])):
+                    $zpool_devices[$zpool_name] = $cache['devices'][$zpool_name];
+                endif;
+            } else {
+                $zpool_datasets[$zpool_name] = buildEmptyDatasetData($zpool_name, $include_snapshots);
             }
-        }
-
-        if ($should_refresh) {
-            if ($include_snapshots):
-                $zpool_datasets[$zpool_name] = getZFSPoolDatasetsAndSnapshots($zpool_name, $exclusion_pattern, $ext, $directory_listing);
-                $zpool_global[$zpool_name]['Snapshots'] = $zpool_datasets[$zpool_name]['total_snapshots'];
-            else:
-                $zpool_datasets[$zpool_name] = getZFSPoolDatasets($zpool_name, $exclusion_pattern, $ext, $directory_listing);
-            endif;
-            $zpool_global[$zpool_name]['MountPoint'] = $zpool_datasets[$zpool_name]['mountpoint'];
-            $zpool_global[$zpool_name]['LastRefresh'] = date('Y-m-d H:i:s');
-        } else if ($cache && isset($cache['datasets'][$zpool_name])) {
-            // Use cached data
-            $zpool_datasets[$zpool_name] = $cache['datasets'][$zpool_name];
-            $zpool_global[$zpool_name] = $cache['pools'][$zpool_name];
-        } else {
-            // No cache and shouldn't refresh, skip or provide minimal data
-            if ($include_snapshots):
-                $zpool_datasets[$zpool_name] = array('name' => $zpool_name, 'child' => array(), 'snapshots' => array(), 'total_snapshots' => 0, 'mountpoint' => '');
-            else:
-                $zpool_datasets[$zpool_name] = array('name' => $zpool_name, 'child' => array(), 'mountpoint' => '');
-            endif;
-        }
-    endforeach;
+        endforeach;
+    endif;
 
     $message = array();
+    if ($force_pool !== null) {
+        $message['pool'] = $force_pool;
+    }
     $message['data'] = array();
     $message['op'] = $include_snapshots ? "getAll" : "getDatasets";
     $message['data']['pools'] = $zpool_global;
@@ -103,10 +173,6 @@ function getData($include_snapshots, $exclusion_pattern, $directory_listing, $ex
     $message['data']['timestamp'] = date('Y-m-d H:i:s');
 
     publish('zfs_master', json_encode($message));
-
-    if ($include_snapshots):
-        file_put_contents('/tmp/zfsm_cache.json', json_encode($message['data']));
-    endif;
 
     return $message;
 }
@@ -119,25 +185,35 @@ function getAllData($exclusion_pattern, $directory_listing, $ext, $awake_only = 
     publish('zfs_master', json_encode($refresh_message));
 
     $message = getData(true, $exclusion_pattern, $directory_listing, $ext, $awake_only, $force_pool);
+    writeCacheData($message['data']);
 
     $refresh_message['op'] = 'stop_refresh';
     publish('zfs_master', json_encode($refresh_message));
 }
 
-function getDatasetsSnapshots($zpool, $zdatasets, $ext) {
-    $message = array();
-    $message['data'] = array();
-    $message['op'] = "getSnapshot";
-    $message['data']['pool'] = $zpool;
+function getDatasetsSnapshots($zpool, $zdatasets, $ext, &$total_snapshots = 0) {
+    foreach ($zdatasets as $dataset_name => $zdataset):
+        $snapshots = getDatasetSnapshots($zpool, $zdataset['name'], $ext);
+        $zdataset['snapshots'] = $snapshots;
+        $total_snapshots += count($snapshots);
 
-    foreach ($zdatasets as $zdataset):
+        if (isset($zdataset['child']) && count($zdataset['child'])):
+            $zdataset['child'] = getDatasetsSnapshots($zpool, $zdataset['child'], $ext, $total_snapshots);
+        endif;
+
+        $message = array();
+        $message['data'] = array();
+        $message['op'] = "getSnapshot";
+        $message['data']['pool'] = $zpool;
         $message['data']['dataset'] = $zdataset;
-        $message['data']['snapshots'] = getDatasetSnapshots($zpool, $zdataset['name'], $ext);
+        $message['data']['snapshots'] = $snapshots;
 
         publish('zfs_master', json_encode($message));
 
-        getDatasetsSnapshots($zpool, $zdataset['child'], $ext);
+        $zdatasets[$dataset_name] = $zdataset;
     endforeach;
+
+    return $zdatasets;
 }
 
 function getLazyLoadData($exclusion_pattern, $directory_listing, $ext, $awake_only = 0, $force_pool = null) {
@@ -149,11 +225,21 @@ function getLazyLoadData($exclusion_pattern, $directory_listing, $ext, $awake_on
 
     $message = getData(false, $exclusion_pattern, $directory_listing, $ext, $awake_only, $force_pool);
 
-    foreach ($message['data']['datasets'] as $zpool):
-        if (isset($zpool['child'])) {
-            getDatasetsSnapshots($zpool['name'], $zpool['child'], $ext);
+    foreach ($message['data']['datasets'] as $zpool_name => &$zpool):
+        if ($force_pool !== null && $zpool_name !== $force_pool):
+            continue;
+        endif;
+
+        if (isset($zpool['child']) && count($zpool['child'])) {
+            $total_snapshots = 0;
+            $zpool['child'] = getDatasetsSnapshots($zpool_name, $zpool['child'], $ext, $total_snapshots);
+            if (isset($message['data']['pools'][$zpool_name])):
+                $message['data']['pools'][$zpool_name]['Snapshots'] = $total_snapshots;
+            endif;
         }
     endforeach;
+
+    writeCacheData($message['data']);
 
     $refresh_message['op'] = 'stop_refresh';
     publish('zfs_master', json_encode($refresh_message));
