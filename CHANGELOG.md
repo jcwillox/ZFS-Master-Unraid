@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+### 🐛 Bug Fixes
+
+* Rendering of last refresh time and use relative ([603b550](https://github.com/jcwillox/ZFS-Master-Unraid/commit/603b550e41e794064d30b52de9be9310fc14adae))
+
+**Full Changelog**: [`v1.0.0...v1.0.1`](https://github.com/jcwillox/ZFS-Master-Unraid/compare/v1.0.0...v1.0.1)
+
 ## 1.0.0
 
 ### ✨ Features
