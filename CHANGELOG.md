@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2
+
+### 🐛 Bug Fixes
+
+* Prevent spinning up other pools when using individual refresh ([45c7a59](https://github.com/jcwillox/ZFS-Master-Unraid/commit/45c7a59d52dc5ba2c2c00c1e966982d2cff92639))
+
+**Full Changelog**: [`v1.0.1...v1.0.2`](https://github.com/jcwillox/ZFS-Master-Unraid/compare/v1.0.1...v1.0.2)
+
 ## 1.0.1
 
 ### 🐛 Bug Fixes
