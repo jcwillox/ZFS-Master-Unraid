@@ -27,8 +27,9 @@ if (file_exists('/tmp/zfsm_cache.json')) {
   .zfs_table td span{margin-left:10px}
   .zfs_table tr>td{width:auto!important}
   .zfs_table tr>td+td+td{text-align:left!important}
-  .zfs_table tr>td+td+td+td+td+td+td+td{text-align:left!important}
-  .zfs_table tr>td+td+td+td+td+td+td+td+td{text-align:center!important}
+  .zfs_table tr>td+td+td+td{text-align:left!important}
+  .zfs_table tr>td+td+td+td+td+td+td+td+td{text-align:left!important}
+  .zfs_table tr>td+td+td+td+td+td+td+td+td+td{text-align:center!important}
   
   .zfs_bar_button {
 	  padding-right: 8px;
@@ -46,7 +47,11 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 
   .zfs_pool_refresh_status {
 	  display: inline-block;
-	  margin: 0 8px;
+	  margin: 0 8px 0 0;
+	  white-space: nowrap;
+  }
+
+  .zfs_pool_refresh_cell {
 	  white-space: nowrap;
   }
 
@@ -76,7 +81,7 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 
 <div id="zfs-master-title" class="title zfs_master_title">
 	<span class="left zfs_bar_text">
-		<a class="tooltip" title="Information refresh time"><i id="zfsm-last-refresh"></i></a>
+		<span id="zfsm-last-refresh"></span>
 	</span>
 	<span class="zfs_bar_button">
 		<a style="cursor:pointer" class="tooltip" title="ZFS Master Settings" href="/Settings/ZFSMasterSettings"><i id="zfsm-settings" class="fa fa-gear"></i></a>
@@ -92,6 +97,7 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 		<td>Pool</td>
 		<td>Health</td>
 		<td>Option/Dataset Name</td>
+		<td>Last Refresh</td>
 		<td>Size</td>
 		<td>Mount Point</td>
 		<td>Refer</td>
@@ -119,6 +125,10 @@ if (file_exists('/tmp/zfsm_cache.json')) {
   var zfsm_config = <?=json_encode($zfsm_cfg)?>;
   var zfsm_server_cache = <?=json_encode($zfsm_cache)?>;
 
+  function updatePageLastRefresh(timestamp) {
+    setRefreshTimestampText(document.getElementById('zfsm-last-refresh'), timestamp);
+  }
+
   if (zfsm_config['version'].localeCompare('6.12.13', undefined, { numeric: true, sensitivity: 'base' }) == 1) {
 	$('#zfs_master').removeClass('disk_status legacy');
   }
@@ -128,12 +138,12 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 	var msg = JSON.parse(data);
     if (msg.op == 'getAll') {
 		updateFullBodyTable(msg.data, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
-		$('#zfsm-last-refresh').text('Last refresh at '+msg.data.timestamp);
+		updatePageLastRefresh(msg.data.timestamp);
 
 		saveCache(msg.data);
     } else if (msg.op == 'getDatasets') {
 		updateFullBodyTable(msg.data, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
-		$('#zfsm-last-refresh').text('Last refresh at '+msg.data.timestamp);
+		updatePageLastRefresh(msg.data.timestamp);
 
         for (const pool in msg.data['pools']) {
 			$('#'+pool+'-attribute-snapshots > span').text('0');
@@ -183,7 +193,7 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 	  zfs_sub.start();
 	  if (zfsm_server_cache !== null) {
 		updateFullBodyTable(zfsm_server_cache, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
-		$('#zfsm-last-refresh').text('Last refresh at '+zfsm_server_cache.timestamp);
+		updatePageLastRefresh(zfsm_server_cache.timestamp);
 		processHiddenDatasets();
 	  } else if (zfsm_config['refresh_interval'] > 0) {
 	  	requestRefresh();
@@ -226,8 +236,7 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 
   function saveCache(data) {
 	if (data['timestamp'] === undefined) {
-		const curDate = new Date();
-		data['timestamp'] = curDate.toLocaleString('en-US', { hour12: false });
+		data['timestamp'] = new Date().toISOString();
 	}
 
 	saveToLocalStorage('zfsm-cache', data);
@@ -279,7 +288,7 @@ if (file_exists('/tmp/zfsm_cache.json')) {
 
 	updateFullBodyTable(data, zfsm_config['destructive_mode'], zfsm_config['snap_max_days_alert'], <?=json_encode($display)?>, zfsm_config['directory_listing']);
 
-	$('#zfsm-last-refresh').text('Last refresh at '+data.timestamp);
+	updatePageLastRefresh(data.timestamp);
 
 	processHiddenDatasets();
   }

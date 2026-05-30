@@ -30,6 +30,63 @@ function nl2br(str, is_xhtml) {
     return (str + '').replace(/([^>\r\n]?)(\r\n|\n\r|\r|\n)/g, '$1' + breakTag + '$2');
 }
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+
+function formatRelative(date) {
+	const diffSeconds = Math.round((date.getTime() - Date.now()) / 1000);
+	const absDiffSeconds = Math.abs(diffSeconds);
+	const units = [
+		['year', 31536000],
+		['month', 2592000],
+		['week', 604800],
+		['day', 86400],
+		['hour', 3600],
+		['minute', 60],
+		['second', 1]
+	];
+
+	for (const [unit, seconds] of units) {
+		if (absDiffSeconds >= seconds || unit === 'second') {
+			return relativeTimeFormatter.format(Math.round(diffSeconds / seconds), unit);
+		}
+	}
+
+	return relativeTimeFormatter.format(diffSeconds, 'second');
+}
+
+function getRefreshTimestampDetails(timestamp) {
+	if (timestamp === undefined || timestamp === null || timestamp === '' || timestamp === 'Never') {
+		return {
+			text: 'Never',
+			title: 'Never'
+		};
+	}
+
+	const date = new Date(timestamp);
+
+	if (Number.isNaN(date.getTime())) {
+		return {
+			text: String(timestamp),
+			title: String(timestamp)
+		};
+	}
+
+	return {
+		text: formatRelative(date),
+		title: timestamp
+	};
+}
+
+window.setRefreshTimestampText = (element, timestamp) => {
+	if (!element) {
+		return;
+	}
+
+	const formattedRefresh = getRefreshTimestampDetails(timestamp);
+	element.textContent = 'Last refresh: ' + formattedRefresh.text;
+	element.title = formattedRefresh.title;
+}
+
 function fromBytesToString(bytes) {
 	const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
   
@@ -270,6 +327,7 @@ function generateDatasetDirectoryRows(zpool, zdataset, parent, show_status, dest
 
 		tr += directory.substring(directory.lastIndexOf("/") + 1);
 		tr += '</td>';
+		tr += '<td></td>';
 
 		// Actions
 
@@ -329,7 +387,7 @@ function updateDatasetDirectoryRows(zdataset, snapshots, snap_max_days_alert) {
 		tds = row.getElementsByTagName('td');
 
 		td_dataset = tds[2];
-		td_snaps = tds[8];
+		td_snaps = tds[9];
 	
 		var tmp = '';
 	
@@ -470,6 +528,7 @@ function generateDatasetRow(zpool, zdataset, parent, show_status, destructive_mo
 
 	tr += zdataset['name'].substring(zdataset['name'].lastIndexOf("/") + 1);
 	tr += '</td>';
+	tr += '<td></td>';
 
 	// Actions
 
@@ -571,8 +630,8 @@ function generatePoolTableRows(zpool, devices, show_status, display) {
 	const show_button_text = getPoolShowButtonText(show_status);
 	const status_color = getPoolStatusColor(zpool['Health']);
 	const status_msg = getPoolStatusMsg(zpool['Health']);
+	const lastRefresh = getRefreshTimestampDetails(zpool['LastRefresh']);
 
-	const lastRefresh = zpool['LastRefresh'] ? zpool['LastRefresh'] : 'Never';
 	const refreshIconId = 'zfsm-refresh-'+zpool['Pool'];
 
 	// Name and devices
@@ -583,9 +642,13 @@ function generatePoolTableRows(zpool, devices, show_status, display) {
 
 	// Buttons
 	tr += '<td id="'+zpool['Pool']+'-attribute-name"><button type="button" id="show-zpool-'+zpool['Pool']+'" onclick="togglePoolTable(\'show-zpool-'+zpool['Pool']+'\', \'zdataset-'+zpool['Pool']+'\');">'+show_button_text+'</button>';
-	tr += '<span class="zfs_pool_refresh_status">Last refresh: '+lastRefresh+'</span>';
-	tr += '<a style="cursor:pointer" class="tooltip zfs_pool_refresh_button" title="Refresh '+zpool['Pool']+'" onclick="refreshPool(\''+zpool['Pool']+'\');"><i id="'+refreshIconId+'" class="fa fa-refresh"></i></a>';
 	tr += '<button type="button" onclick="createDataset(\''+zpool['Pool']+'\');">Create Dataset</button></td>';
+
+	// Last refresh
+	tr += '<td id="'+zpool['Pool']+'-attribute-refresh" class="zfs_pool_refresh_cell">';
+	tr += '<span class="zfs_pool_refresh_status" title="'+lastRefresh.title+'">'+lastRefresh.text+'</span>';
+	tr += '<a style="cursor:pointer" class="tooltip zfs_pool_refresh_button" title="Refresh '+zpool['Pool']+'" onclick="refreshPool(\''+zpool['Pool']+'\');"><i id="'+refreshIconId+'" class="fa fa-refresh"></i></a>';
+	tr += '</td>';
 
 	// Size
 	tr += '<td id="'+zpool['Pool']+'-attribute-size">'+zpool['Size']+'</td>'; 
@@ -651,8 +714,8 @@ async function updateSnapshotInfo(data, destructive_mode, snap_max_days_alert, d
 	tds = row.getElementsByTagName('td');
 
 	td_dataset = tds[2];
-	td_button = tds[3];
-	td_snaps = tds[8];
+	td_button = tds[4];
+	td_snaps = tds[9];
 
 	var properties = getPropertiesByType(data.dataset);
 
